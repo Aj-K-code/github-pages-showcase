@@ -2,7 +2,7 @@
 
 A modern, interactive dashboard for healthcare analytics built with HTML, CSS, and JavaScript. This project showcases a sophisticated UI for visualizing CMS (Centers for Medicare & Medicaid Services) data with advanced analytics features.
 
-![Healthcare Analytics Dashboard](https://aj-k-code.github.io/github-pages-showcase/)
+Check it out here: https://aj-k-code.github.io/github-pages-showcase/
 
 ## Features
 
