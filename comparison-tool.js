@@ -4,19 +4,26 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Add comparison button to relevant cards
-    addComparisonButtons();
-    
     // Initialize comparison panel
     initComparisonPanel();
+    
+    // Add comparison button to relevant cards
+    setTimeout(() => {
+        addComparisonButtons();
+    }, 500); // Delay to ensure all cards are rendered
 });
 
 /**
  * Add comparison buttons to dashboard cards
  */
 function addComparisonButtons() {
-    // Add to provider cards
+    // Add to all dashboard cards
     document.querySelectorAll('.dashboard-card').forEach(card => {
+        // Skip if button already exists
+        if (card.querySelector('.compare-btn')) {
+            return;
+        }
+        
         const cardActions = card.querySelector('.card-actions');
         if (cardActions) {
             const compareBtn = document.createElement('button');
@@ -26,14 +33,93 @@ function addComparisonButtons() {
             
             compareBtn.addEventListener('click', function(e) {
                 e.preventDefault();
+                e.stopPropagation();
+                
                 const cardTitle = card.querySelector('.card-header h3').textContent;
                 const cardType = card.dataset.type || 'metric';
                 addToComparison(cardTitle, cardType, card);
             });
             
-            cardActions.appendChild(compareBtn);
+            // Insert before the last button
+            cardActions.insertBefore(compareBtn, cardActions.lastChild);
         }
     });
+    
+    // Set up a mutation observer to add comparison buttons to new cards
+    setupCardObserver();
+}
+
+/**
+ * Set up a mutation observer to watch for new cards being added to the DOM
+ */
+function setupCardObserver() {
+    // Create a new observer
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                // Check each added node
+                mutation.addedNodes.forEach(function(node) {
+                    if (node.nodeType === 1) { // Element node
+                        // Check if it's a dashboard card
+                        if (node.classList && node.classList.contains('dashboard-card')) {
+                            // Add comparison button if it doesn't have one
+                            if (!node.querySelector('.compare-btn')) {
+                                const cardActions = node.querySelector('.card-actions');
+                                if (cardActions) {
+                                    const compareBtn = document.createElement('button');
+                                    compareBtn.className = 'btn-icon compare-btn';
+                                    compareBtn.innerHTML = '<i class="fas fa-balance-scale"></i>';
+                                    compareBtn.title = 'Add to comparison';
+                                    
+                                    compareBtn.addEventListener('click', function(e) {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        
+                                        const cardTitle = node.querySelector('.card-header h3').textContent;
+                                        const cardType = node.dataset.type || 'metric';
+                                        addToComparison(cardTitle, cardType, node);
+                                    });
+                                    
+                                    // Insert before the last button
+                                    cardActions.insertBefore(compareBtn, cardActions.lastChild);
+                                }
+                            }
+                        }
+                        
+                        // Check children recursively
+                        if (node.querySelectorAll) {
+                            node.querySelectorAll('.dashboard-card').forEach(card => {
+                                if (!card.querySelector('.compare-btn')) {
+                                    const cardActions = card.querySelector('.card-actions');
+                                    if (cardActions) {
+                                        const compareBtn = document.createElement('button');
+                                        compareBtn.className = 'btn-icon compare-btn';
+                                        compareBtn.innerHTML = '<i class="fas fa-balance-scale"></i>';
+                                        compareBtn.title = 'Add to comparison';
+                                        
+                                        compareBtn.addEventListener('click', function(e) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            
+                                            const cardTitle = card.querySelector('.card-header h3').textContent;
+                                            const cardType = card.dataset.type || 'metric';
+                                            addToComparison(cardTitle, cardType, card);
+                                        });
+                                        
+                                        // Insert before the last button
+                                        cardActions.insertBefore(compareBtn, cardActions.lastChild);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+        });
+    });
+    
+    // Start observing the document with the configured parameters
+    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 /**
@@ -73,6 +159,9 @@ function initComparisonPanel() {
         
         // Setup event listeners
         setupComparisonEvents();
+        
+        // Show comparison toggle initially
+        showComparisonToggle();
     }
 }
 
@@ -123,7 +212,7 @@ function showComparisonToggle() {
         
         toggle.addEventListener('click', function() {
             // Hide the toggle
-            this.remove();
+            this.style.display = 'none';
             
             // Show the panel
             const panel = document.querySelector('.comparison-panel');
@@ -151,6 +240,12 @@ function addToComparison(title, type, sourceElement) {
     // Show panel if hidden
     panel.classList.remove('hidden');
     
+    // Hide toggle button
+    const toggle = document.querySelector('.comparison-toggle');
+    if (toggle) {
+        toggle.style.display = 'none';
+    }
+    
     // Hide empty state
     emptyState.style.display = 'none';
     
@@ -159,7 +254,11 @@ function addToComparison(title, type, sourceElement) {
     for (let i = 0; i < existingItems.length; i++) {
         if (existingItems[i].dataset.title === title) {
             // Already exists, show notification
-            showNotification(`"${title}" is already in your comparison`, 'info');
+            if (typeof showNotification === 'function') {
+                showNotification(`"${title}" is already in your comparison`, 'info');
+            } else {
+                alert(`"${title}" is already in your comparison`);
+            }
             return;
         }
     }
@@ -175,6 +274,7 @@ function addToComparison(title, type, sourceElement) {
     if (type === 'provider') icon = 'hospital';
     if (type === 'procedure') icon = 'procedures';
     if (type === 'region') icon = 'map-marker-alt';
+    if (type === 'visualization') icon = 'chart-line';
     
     item.innerHTML = `
         <div class="comparison-item-icon">
@@ -199,10 +299,14 @@ function addToComparison(title, type, sourceElement) {
     updateComparisonState();
     
     // Show notification
-    showNotification(`Added "${title}" to comparison`, 'success');
+    if (typeof showNotification === 'function') {
+        showNotification(`Added "${title}" to comparison`, 'success');
+    }
     
-    // Highlight source element
-    sourceElement.classList.add('in-comparison');
+    // Mark source element as in comparison
+    if (sourceElement) {
+        sourceElement.classList.add('in-comparison');
+    }
 }
 
 /**
@@ -215,13 +319,13 @@ function updateComparisonState() {
     const viewBtn = panel.querySelector('#view-comparison');
     const clearBtn = panel.querySelector('#clear-comparison');
     
-    // Check if there are items
+    // Check if there are any items
     const hasItems = itemsContainer.children.length > 0;
     
-    // Update empty state
+    // Show/hide empty state
     emptyState.style.display = hasItems ? 'none' : 'flex';
     
-    // Update buttons
+    // Enable/disable buttons
     viewBtn.disabled = !hasItems;
     clearBtn.disabled = !hasItems;
 }
@@ -234,18 +338,22 @@ function clearComparison() {
     const itemsContainer = panel.querySelector('.comparison-items');
     
     // Remove all items
-    itemsContainer.innerHTML = '';
+    while (itemsContainer.firstChild) {
+        itemsContainer.removeChild(itemsContainer.firstChild);
+    }
     
     // Update state
     updateComparisonState();
     
-    // Remove highlights from source elements
+    // Remove in-comparison class from all cards
     document.querySelectorAll('.in-comparison').forEach(el => {
         el.classList.remove('in-comparison');
     });
     
     // Show notification
-    showNotification('Comparison cleared', 'info');
+    if (typeof showNotification === 'function') {
+        showNotification('Comparison cleared', 'info');
+    }
 }
 
 /**
@@ -254,129 +362,154 @@ function clearComparison() {
 function showComparisonView() {
     const panel = document.querySelector('.comparison-panel');
     const itemsContainer = panel.querySelector('.comparison-items');
-    const items = itemsContainer.querySelectorAll('.comparison-item');
+    const items = Array.from(itemsContainer.querySelectorAll('.comparison-item'));
     
-    // Collect items data
-    const comparisonData = [];
-    items.forEach(item => {
-        comparisonData.push({
-            title: item.dataset.title,
-            type: item.dataset.type
-        });
-    });
+    if (items.length === 0) {
+        return;
+    }
     
     // Create modal backdrop
     const backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     
-    // Create comparison content
-    let comparisonContent = `
-        <div class="comparison-grid">
-            <div class="comparison-header-row">
-                <div class="comparison-header-cell"></div>
+    // Create modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    
+    // Create modal header
+    const header = document.createElement('div');
+    header.className = 'modal-header';
+    header.innerHTML = `
+        <h3>Comparison Results</h3>
+        <button class="close-modal">
+            <i class="fas fa-times"></i>
+        </button>
     `;
     
-    // Add header cells
-    comparisonData.forEach(item => {
-        comparisonContent += `
-            <div class="comparison-header-cell">
-                <h4>${item.title}</h4>
-                <div class="comparison-type">${item.type}</div>
-            </div>
+    // Create modal body
+    const body = document.createElement('div');
+    body.className = 'modal-body';
+    
+    // Create comparison grid
+    const grid = document.createElement('div');
+    grid.className = 'comparison-grid';
+    
+    // Create header row
+    const headerRow = document.createElement('div');
+    headerRow.className = 'comparison-header-row';
+    
+    // Add empty cell for labels
+    const emptyCell = document.createElement('div');
+    emptyCell.className = 'comparison-header-cell';
+    headerRow.appendChild(emptyCell);
+    
+    // Add header cells for each item
+    items.forEach(item => {
+        const cell = document.createElement('div');
+        cell.className = 'comparison-header-cell';
+        cell.innerHTML = `
+            ${item.dataset.title}
+            <div class="comparison-type">${item.dataset.type}</div>
         `;
+        headerRow.appendChild(cell);
     });
     
-    comparisonContent += `</div>`;
+    grid.appendChild(headerRow);
     
-    // Add metric rows
+    // Add data rows
     const metrics = [
-        { name: 'Cost', icon: 'dollar-sign' },
-        { name: 'Quality Score', icon: 'star' },
-        { name: 'Patient Satisfaction', icon: 'smile' },
-        { name: 'Readmission Rate', icon: 'redo' },
-        { name: 'Procedure Volume', icon: 'chart-line' }
+        { label: 'Quality Score', icon: 'star', type: 'rating' },
+        { label: 'Cost Efficiency', icon: 'dollar-sign', type: 'percentage' },
+        { label: 'Patient Volume', icon: 'users', type: 'number' },
+        { label: 'Readmission Rate', icon: 'redo', type: 'percentage' },
+        { label: 'Complication Rate', icon: 'exclamation-triangle', type: 'percentage' },
+        { label: 'Patient Satisfaction', icon: 'smile', type: 'rating' }
     ];
     
     metrics.forEach(metric => {
-        comparisonContent += `
-            <div class="comparison-row">
-                <div class="comparison-label-cell">
-                    <i class="fas fa-${metric.icon}"></i>
-                    <span>${metric.name}</span>
-                </div>
-        `;
+        const row = document.createElement('div');
+        row.className = 'comparison-row';
         
-        // Add data cells with random values for demo
-        comparisonData.forEach(item => {
-            let value;
+        // Add label cell
+        const labelCell = document.createElement('div');
+        labelCell.className = 'comparison-label-cell';
+        labelCell.innerHTML = `
+            <i class="fas fa-${metric.icon}"></i>
+            ${metric.label}
+        `;
+        row.appendChild(labelCell);
+        
+        // Add data cells for each item
+        items.forEach(item => {
+            const cell = document.createElement('div');
+            cell.className = 'comparison-data-cell';
             
-            // Generate appropriate random values based on metric
-            if (metric.name === 'Cost') {
-                value = `$${(Math.random() * 10000).toFixed(2)}`;
-            } else if (metric.name === 'Quality Score') {
-                const score = (Math.random() * 5).toFixed(1);
-                value = `<div class="star-rating" data-rating="${score}">
-                    ${generateStarRating(score)}
-                </div>`;
-            } else if (metric.name === 'Patient Satisfaction') {
-                const percent = Math.floor(Math.random() * 100);
-                value = `<div class="progress-bar">
-                    <div class="progress-fill" style="width: ${percent}%"></div>
-                    <span>${percent}%</span>
-                </div>`;
-            } else if (metric.name === 'Readmission Rate') {
-                const rate = (Math.random() * 20).toFixed(1);
-                value = `${rate}%`;
+            // Generate random data for demonstration
+            if (metric.type === 'rating') {
+                const rating = Math.random() * 5;
+                cell.innerHTML = generateStarRating(rating);
+            } else if (metric.type === 'percentage') {
+                const value = Math.random() * 100;
+                const isGood = metric.label === 'Cost Efficiency' ? value > 50 : value < 50;
+                const color = isGood ? 'var(--success)' : 'var(--danger)';
+                
+                cell.innerHTML = `
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${value}%; background: ${color}"></div>
+                    </div>
+                    ${value.toFixed(1)}%
+                `;
             } else {
-                value = Math.floor(Math.random() * 1000);
+                const value = Math.floor(Math.random() * 10000);
+                cell.textContent = value.toLocaleString();
             }
             
-            comparisonContent += `
-                <div class="comparison-data-cell">${value}</div>
-            `;
+            row.appendChild(cell);
         });
         
-        comparisonContent += `</div>`;
+        grid.appendChild(row);
     });
     
-    comparisonContent += `</div>`;
+    body.appendChild(grid);
     
-    // Create modal
-    const modal = document.createElement('div');
-    modal.className = 'modal comparison-modal';
-    modal.innerHTML = `
-        <div class="modal-header">
-            <h3>Healthcare Metrics Comparison</h3>
-            <button class="close-modal"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-body">
-            ${comparisonContent}
-        </div>
-        <div class="modal-footer">
-            <button class="btn" id="export-comparison">Export as PDF</button>
-            <button class="btn btn-outline" id="close-comparison">Close</button>
-        </div>
+    // Create modal footer
+    const footer = document.createElement('div');
+    footer.className = 'modal-footer';
+    footer.innerHTML = `
+        <button class="btn btn-sm btn-outline" id="export-comparison">
+            <i class="fas fa-download"></i> Export as PDF
+        </button>
+        <button class="btn btn-sm" id="close-comparison-modal">Close</button>
     `;
     
-    // Add to body
+    // Assemble modal
+    modal.appendChild(header);
+    modal.appendChild(body);
+    modal.appendChild(footer);
+    backdrop.appendChild(modal);
+    
+    // Add to document
     document.body.appendChild(backdrop);
-    document.body.appendChild(modal);
     
-    // Handle close
-    const closeModal = () => {
+    // Setup event listeners
+    backdrop.querySelector('.close-modal').addEventListener('click', function() {
         backdrop.remove();
-        modal.remove();
-    };
+    });
     
-    modal.querySelector('#close-comparison').addEventListener('click', closeModal);
-    modal.querySelector('.close-modal').addEventListener('click', closeModal);
+    backdrop.querySelector('#close-comparison-modal').addEventListener('click', function() {
+        backdrop.remove();
+    });
     
-    // Handle export
-    modal.querySelector('#export-comparison').addEventListener('click', () => {
-        showNotification('Exporting comparison as PDF...', 'info');
+    backdrop.querySelector('#export-comparison').addEventListener('click', function() {
+        // Show notification
+        if (typeof showNotification === 'function') {
+            showNotification('Comparison exported as PDF', 'success');
+        }
+        
+        // Remove modal after a delay
         setTimeout(() => {
-            showNotification('Comparison exported successfully!', 'success');
-        }, 1500);
+            backdrop.remove();
+        }, 1000);
     });
 }
 
@@ -390,22 +523,25 @@ function generateStarRating(rating) {
     const halfStar = rating % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
     
-    let html = '';
+    let html = '<div class="star-rating">';
     
-    // Full stars
+    // Add full stars
     for (let i = 0; i < fullStars; i++) {
         html += '<i class="fas fa-star"></i>';
     }
     
-    // Half star
+    // Add half star if needed
     if (halfStar) {
         html += '<i class="fas fa-star-half-alt"></i>';
     }
     
-    // Empty stars
+    // Add empty stars
     for (let i = 0; i < emptyStars; i++) {
         html += '<i class="far fa-star"></i>';
     }
+    
+    html += '</div>';
+    html += `<div class="rating-value">${rating.toFixed(1)}</div>`;
     
     return html;
 }
